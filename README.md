@@ -2,6 +2,98 @@
 
 Production-ready frontend applications for the Firaye time-bound access control platform.
 
+---
+
+## 🧠 Firaye Project - Cursor Memory Recovery Instruction Guide
+
+**This is a living document that must be referenced by Cursor each time it forgets prior progress, roles, naming conventions, project goals, or instructions. Do not proceed without reading and confirming understanding.**
+
+### 🏛️ Project Name: Firaye
+
+Firaye is a dual-platform (frontend + backend) application composed of:
+
+- **firaye-frontend** (Next.js)
+- **firaye-core** (Python/FastAPI)
+
+It is being deployed to:
+
+- **Vercel** (for frontend)
+- **Render** (for backend)
+
+**Domains:**
+
+- `merchant.firaye.com` → merchant dashboard (Vercel)
+- `app.firaye.com` → customer-facing app (Vercel)
+- `api.firaye.com` → FastAPI backend (Render)
+
+### 🔹 CONTEXT YOU MUST NEVER FORGET
+
+**GitHub Organization & Repositories:**
+
+All source code is hosted in the **Dev-Firaye** GitHub organization under two separate repositories:
+
+- **firaye-core** → Python FastAPI backend
+- **firaye-frontend** → Next.js frontend (with `/merchant-dashboard` and `/user-app` folders)
+
+**Branch Strategy:**
+
+- Use **`dev` branch** for all staging/pre-production updates
+- Use **`main` branch** only for production-ready deployments
+- Do not create new repos unless explicitly instructed
+- Push structured commits with relevant context (e.g., "fix: connect merchant dashboard to access key API")
+- If the remote repositories are not yet linked locally, initialize using `git remote add`, and ensure Vercel (frontend) and Render (backend) are correctly linked to the corresponding GitHub repo and branch
+
+**We are not creating a new project, we are continuing work on an existing project where the deployments are already in place.**
+
+You have previously received and executed commands related to:
+
+- Creating subdomains on Namecheap
+- Linking Vercel to the correct GitHub repo and root directory
+- Editing environment variables (`NEXT_PUBLIC_API_BASE_URL`, etc.)
+- Styling issues (e.g., responsiveness, mobile layout fixes)
+- Rendering issues during Vercel build
+- Adjusting project structure and deployment settings
+
+You have previously deployed:
+
+- **firaye-frontend** via Vercel (see: deployed merchant dashboard screenshot)
+- **firaye-core** via Render (using free tier, build: `poetry install`, start: `uvicorn main:app ...`)
+
+You confirmed the merchant dashboard is connected to `merchant.firaye.com` but Vercel showed "Invalid Configuration" until the CNAME was added to Namecheap. You must know what this means.
+
+You were instructed to test and confirm:
+
+- If deployments are mobile-responsive
+- If the frontend is using the correct subdomain in `.env` or Vercel env vars
+
+### 💬 INSTRUCTIONS TO YOU, CURSOR (each time you run)
+
+**"Before doing anything, review this doc and re-establish memory of the Firaye project. Check domain mappings, previous deployments, what repo and folder you are editing, and what still needs to be done."**
+
+If unsure of what to do:
+
+- Ask: "Should I be working on firaye-core or firaye-frontend right now?"
+- Confirm: "Which subdomain does this connect to?"
+- Do not suggest new project setups unless explicitly instructed.
+
+### ✨ Final Command Summary (Last Known Setup)
+
+**firaye-frontend**
+
+- Hosted on Vercel
+- Subdomain: `merchant.firaye.com`
+- Directory: `/merchant-dashboard`
+- Env var: `NEXT_PUBLIC_API_BASE_URL=merchant.firaye.com`
+
+**firaye-core**
+
+- Hosted on Render (free tier)
+- Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- Build command: `poetry install`
+- Subdomain: will be `api.firaye.com`
+
+---
+
 ## 📁 Project Structure
 
 ```
