@@ -12,6 +12,7 @@ import {
   ArrowRightOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
+  CodeBracketIcon,
 } from '@heroicons/react/24/outline'
 import Cookies from 'js-cookie'
 import { useRouter } from 'next/navigation'
@@ -20,6 +21,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Products', href: '/products', icon: CubeIcon },
   { name: 'Access Keys', href: '/keys', icon: KeyIcon },
+  { name: 'App Integration', href: '/integration', icon: CodeBracketIcon },
   { name: 'Logs', href: '/logs', icon: DocumentTextIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ]
