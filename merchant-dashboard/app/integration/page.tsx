@@ -45,27 +45,31 @@ export default function IntegrationPage() {
 
   const handleTestKey = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!testKey.trim()) return
+    if (!testKey.trim() || !apiKey) return
 
     setTestLoading(true)
     setTestError(null)
     setTestResult(null)
 
     try {
-      const response = await api.post(
-        '/access/validate-key',
-        { key: testKey },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        }
-      )
-      setTestResult(response.data.data)
+      // Use fetch directly to include merchant API key in Authorization header
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiBaseUrl}/access/validate-key`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ key: testKey }),
+      })
+      
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.detail || data.error?.message || 'Validation failed')
+      }
+      setTestResult(data.data)
     } catch (err: any) {
       setTestError(
-        err.response?.data?.error?.message ||
-        err.response?.data?.detail ||
         err.message ||
         'Failed to validate key'
       )
