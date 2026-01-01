@@ -45,6 +45,7 @@ function ProductsPageContent() {
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [showGenerateKeyModal, setShowGenerateKeyModal] = useState<Product | null>(null)
 
   useEffect(() => {
     loadProducts()
@@ -158,6 +159,17 @@ function ProductsPageContent() {
           onSuccess={() => {
             setShowCreateModal(false)
             setEditingProduct(null)
+            loadProducts()
+          }}
+        />
+      )}
+
+      {showGenerateKeyModal && (
+        <GenerateKeyModal
+          product={showGenerateKeyModal}
+          onClose={() => setShowGenerateKeyModal(null)}
+          onSuccess={() => {
+            setShowGenerateKeyModal(null)
             loadProducts()
           }}
         />
