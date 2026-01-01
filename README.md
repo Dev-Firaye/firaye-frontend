@@ -81,16 +81,17 @@ If unsure of what to do:
 **firaye-frontend**
 
 - Hosted on Vercel
-- Subdomain: `merchant.firaye.com`
-- Directory: `/merchant-dashboard`
-- Env var: `NEXT_PUBLIC_API_BASE_URL=merchant.firaye.com`
+- Subdomain: `merchant.firaye.com` (merchant dashboard), `app.firaye.com` (user app)
+- Directory: `/merchant-dashboard` or `/user-app`
+- Env var: `NEXT_PUBLIC_API_BASE_URL=https://api.firaye.com` (must point to API Gateway, not frontend domain!)
 
 **firaye-core**
 
 - Hosted on Render (free tier)
 - Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-- Build command: `poetry install`
+- Build command: `poetry install && alembic upgrade head` (includes database migrations)
 - Subdomain: will be `api.firaye.com`
+- **CRITICAL**: Must set `DATABASE_URL` environment variable in Render to your Render PostgreSQL connection string (NOT localhost!)
 
 ---
 
