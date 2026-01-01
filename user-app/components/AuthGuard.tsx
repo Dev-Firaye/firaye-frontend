@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Cookies from 'js-cookie'
 import { getUserRole, isAuthenticated } from '@/lib/auth'
+import { setRouter } from '@/lib/api'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -12,14 +13,17 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Set router instance for API interceptor
+    setRouter(router)
+
     // Only run on client side
     if (typeof window === 'undefined') {
       setIsLoading(false)
       return
     }
 
-    // Don't check auth on login page
-    if (pathname === '/login') {
+    // Don't check auth on login/signup pages
+    if (pathname === '/login' || pathname === '/signup') {
       setIsLoading(false)
       setIsAuthorized(true)
       return

@@ -1,18 +1,10 @@
-import AuthGuard from '@/components/AuthGuard'
-import Navbar from '@/components/Navbar'
+import SharedLayout from '@/components/SharedLayout'
 
 export default function ProductsLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return (
-    <AuthGuard>
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <main>{children}</main>
-      </div>
-    </AuthGuard>
-  )
+  return <SharedLayout>{children}</SharedLayout>
 }
 

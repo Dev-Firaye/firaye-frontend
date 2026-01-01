@@ -1,19 +1,31 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Cookies from 'js-cookie'
 import { getUserRole, isAuthenticated } from '@/lib/auth'
+import { setRouter } from '@/lib/api'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Set router instance for API interceptor
+    setRouter(router)
+
+    // Don't check auth on login/signup pages
+    if (pathname === '/login' || pathname === '/signup') {
+      setIsLoading(false)
+      setIsAuthorized(true)
+      return
+    }
+
     // Check if user is authenticated
     if (!isAuthenticated()) {
-      router.push('/login')
+      router.replace('/login')
       return
     }
 
@@ -23,13 +35,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       // Clear tokens and redirect to login with error message
       Cookies.remove('firaye_token')
       Cookies.remove('firaye_refresh_token')
-      router.push('/login?error=unauthorized')
+      router.replace('/login?error=unauthorized')
       return
     }
 
     setIsAuthorized(true)
     setIsLoading(false)
-  }, [router])
+  }, [router, pathname])
 
   if (isLoading) {
     return (

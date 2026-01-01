@@ -3,6 +3,13 @@ import Cookies from 'js-cookie'
 
 const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
+// Router instance for navigation (will be set by interceptor)
+let routerInstance: any = null
+
+export function setRouter(router: any) {
+  routerInstance = router
+}
+
 export const api = axios.create({
   baseURL: apiUrl,
   headers: {
@@ -47,7 +54,12 @@ api.interceptors.response.use(
       if (typeof window !== 'undefined') {
         Cookies.remove('firaye_token')
         Cookies.remove('firaye_refresh_token')
-        window.location.href = '/login'
+        // Use router if available, fallback to window.location
+        if (routerInstance) {
+          routerInstance.push('/login')
+        } else {
+          window.location.href = '/login'
+        }
       }
     }
     return Promise.reject(error)

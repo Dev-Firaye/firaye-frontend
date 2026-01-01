@@ -36,12 +36,13 @@ export default function Navbar() {
             <div className="hidden md:ml-10 md:flex md:items-center md:space-x-2 lg:space-x-4">
               {navigation.map((item) => {
                 const Icon = item.icon
+                const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`px-2 lg:px-3 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center ${
-                      pathname === item.href
+                    className={`px-2 lg:px-3 py-2 rounded-md text-sm font-medium min-h-[44px] flex items-center transition-colors ${
+                      isActive
                         ? 'bg-primary text-white'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
@@ -87,13 +88,14 @@ export default function Navbar() {
           <div className="px-2 pt-2 pb-3 space-y-1">
             {navigation.map((item) => {
               const Icon = item.icon
+              const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
               return (
                 <Link
                   key={item.name}
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center px-3 py-3 rounded-md text-base font-medium min-h-[44px] ${
-                    pathname === item.href
+                  className={`flex items-center px-3 py-3 rounded-md text-base font-medium min-h-[44px] transition-colors ${
+                    isActive
                       ? 'bg-primary text-white'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
