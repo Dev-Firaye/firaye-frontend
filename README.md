@@ -92,8 +92,10 @@ If unsure of what to do:
 - Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
 - Build command: `poetry install && alembic upgrade head` (includes database migrations)
 - Subdomain: `api.firaye.com`
-- **CRITICAL**: Must set `DATABASE_URL` environment variable in Render to your Render PostgreSQL connection string (NOT localhost!)
-- **Monolith Structure**: `main.py` mounts auth, access, and notification services at `/auth`, `/access`, `/notification`
+- **CRITICAL Environment Variables**:
+  - `DATABASE_URL` - Must be set to your Render PostgreSQL connection string (NOT localhost!)
+  - `PAYSTACK_SECRET_KEY` - Paystack secret key for webhook signature validation (required for payment webhooks)
+- **Monolith Structure**: `main.py` mounts auth, access, notification, and payment services at `/auth`, `/access`, `/notification`, `/payment`
 - **Package Mode**: `package-mode = false` in `pyproject.toml` (prevents Poetry build errors on Render)
 
 ---
@@ -254,6 +256,9 @@ Both apps use JWT authentication:
 - `GET /access/admin/keys` - List all merchant keys (with filters: user_id, status, reusable, bound/unbound)
 - `DELETE /access/keys/{key}` - Revoke key
 - `POST /access/validate` - Validate key (used by external apps, handles reusable keys and max_uses)
+
+**Payment Webhooks:**
+- `POST /payment/webhook` - Paystack webhook endpoint (handles charge.success events, automatically creates access keys for users after payment)
 
 ### Placeholder Endpoints
 
