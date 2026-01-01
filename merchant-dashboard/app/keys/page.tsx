@@ -2,16 +2,22 @@
 
 import { useEffect, useState } from 'react'
 import api from '@/lib/api'
-import { TrashIcon, PlusIcon, SparklesIcon } from '@heroicons/react/24/outline'
+import { TrashIcon, PlusIcon, SparklesIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
 interface AccessKey {
   id: number
   key: string
   product_id: number
-  user_id: number
+  product_name?: string
+  user_id: number | null
   status: string
-  expires_at: string
+  expires_at: string | null
   created_at: string
+  label?: string | null
+  scopes?: string | null
+  reusable: boolean
+  max_uses?: number | null
+  uses_count: number
 }
 
 interface Product {
@@ -22,8 +28,13 @@ interface Product {
 
 export default function KeysPage() {
   const [keys, setKeys] = useState<AccessKey[]>([])
+  const [filteredKeys, setFilteredKeys] = useState<AccessKey[]>([])
   const [loading, setLoading] = useState(true)
   const [showGenerateKeyModal, setShowGenerateKeyModal] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [reusableFilter, setReusableFilter] = useState<string>('all')
+  const [userFilter, setUserFilter] = useState<string>('all')
 
   useEffect(() => {
     loadKeys()
@@ -32,13 +43,68 @@ export default function KeysPage() {
   const loadKeys = async () => {
     try {
       const response = await api.get('/access/admin/keys')
-      setKeys(response.data.data?.keys || [])
+      const loadedKeys = response.data.data?.keys || []
+      setKeys(loadedKeys)
+      setFilteredKeys(loadedKeys)
     } catch (error) {
       console.error('Failed to load keys:', error)
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    let filtered = [...keys]
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(key => 
+        key.key.toLowerCase().includes(query) ||
+        key.label?.toLowerCase().includes(query) ||
+        key.product_name?.toLowerCase().includes(query) ||
+        key.scopes?.toLowerCase().includes(query)
+      )
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(key => {
+        if (statusFilter === 'expired') {
+          if (key.expires_at) {
+            return new Date(key.expires_at) < new Date() || key.status === 'expired'
+          }
+          return key.status === 'expired'
+        }
+        if (statusFilter === 'active') {
+          if (key.expires_at) {
+            return new Date(key.expires_at) >= new Date() && key.status === 'active'
+          }
+          return key.status === 'active'
+        }
+        if (statusFilter === 'revoked') {
+          return key.status === 'revoked'
+        }
+        return true
+      })
+    }
+
+    // Reusable filter
+    if (reusableFilter !== 'all') {
+      filtered = filtered.filter(key => 
+        reusableFilter === 'reusable' ? key.reusable : !key.reusable
+      )
+    }
+
+    // User filter
+    if (userFilter !== 'all') {
+      filtered = filtered.filter(key => 
+        userFilter === 'bound' ? key.user_id !== null : key.user_id === null
+      )
+    }
+
+    setFilteredKeys(filtered)
+  }, [keys, searchQuery, statusFilter, reusableFilter, userFilter])
 
   const handleRevoke = async (key: string) => {
     if (!confirm('Are you sure you want to revoke this key?')) return
@@ -85,16 +151,63 @@ export default function KeysPage() {
         />
       )}
 
+      {/* Search and Filters */}
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search keys, labels, products..."
+              className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="expired">Expired</option>
+            <option value="revoked">Revoked</option>
+          </select>
+          <select
+            value={reusableFilter}
+            onChange={(e) => setReusableFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+          >
+            <option value="all">All Types</option>
+            <option value="reusable">Reusable</option>
+            <option value="single-use">Single-use</option>
+          </select>
+          <select
+            value={userFilter}
+            onChange={(e) => setUserFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+          >
+            <option value="all">All Keys</option>
+            <option value="bound">Bound to User</option>
+            <option value="unbound">Unbound</option>
+          </select>
+        </div>
+      </div>
+
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Key
+                Key / Label
               </th>
               <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Product ID
+                Product
+              </th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Properties
               </th>
               <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Status
@@ -108,48 +221,91 @@ export default function KeysPage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {keys.length === 0 ? (
+            {filteredKeys.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 sm:px-6 py-4 text-center text-gray-500">
-                  No keys found.
+                <td colSpan={6} className="px-4 sm:px-6 py-4 text-center text-gray-500">
+                  {keys.length === 0 ? 'No keys found.' : 'No keys match your filters.'}
                 </td>
               </tr>
             ) : (
-              keys.map((key) => (
-                <tr key={key.id} className="hover:bg-gray-50">
-                  <td className="px-4 sm:px-6 py-4">
-                    <code className="text-xs sm:text-sm font-mono text-gray-900 break-all">
-                      {key.key.substring(0, 20)}...
-                    </code>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">{key.product_id}</td>
-                  <td className="px-4 sm:px-6 py-4">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        key.status === 'active'
-                          ? 'bg-green-100 text-green-800'
-                          : key.status === 'revoked'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {key.status}
-                    </span>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 text-xs sm:text-sm text-gray-500">
-                    {new Date(key.expires_at).toLocaleString()}
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 text-right">
-                    <button
-                      onClick={() => handleRevoke(key.key)}
-                      className="text-red-600 hover:text-red-900 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                      title="Revoke"
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))
+              filteredKeys.map((key) => {
+                const isExpired = key.expires_at ? new Date(key.expires_at) < new Date() : false
+                const displayStatus = isExpired && key.status === 'active' ? 'expired' : key.status
+                return (
+                  <tr key={key.id} className="hover:bg-gray-50">
+                    <td className="px-4 sm:px-6 py-4">
+                      <div>
+                        <code className="text-xs sm:text-sm font-mono text-gray-900 break-all block">
+                          {key.key.substring(0, 20)}...
+                        </code>
+                        {key.label && (
+                          <span className="text-xs text-gray-500 mt-1 block">{key.label}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
+                      {key.product_name || `Product ${key.product_id}`}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {key.reusable ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            Reusable
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                            Single-use
+                          </span>
+                        )}
+                        {key.user_id ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                            Bound
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                            Unbound
+                          </span>
+                        )}
+                        {key.reusable && key.max_uses && (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                            {key.uses_count || 0}/{key.max_uses} uses
+                          </span>
+                        )}
+                        {key.scopes && (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800" title={key.scopes}>
+                            {key.scopes.split(',').length} scope{key.scopes.split(',').length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          displayStatus === 'active'
+                            ? 'bg-green-100 text-green-800'
+                            : displayStatus === 'revoked'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {displayStatus}
+                      </span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-xs sm:text-sm text-gray-500">
+                      {key.expires_at ? new Date(key.expires_at).toLocaleString() : 'Never'}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-right">
+                      <button
+                        onClick={() => handleRevoke(key.key)}
+                        className="text-red-600 hover:text-red-900 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        title="Revoke"
+                      >
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
@@ -169,9 +325,13 @@ function GenerateKeyModal({
   const [products, setProducts] = useState<Product[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [selectedProductId, setSelectedProductId] = useState<number | ''>('')
-  const [userEmail, setUserEmail] = useState('')
+  const [label, setLabel] = useState('')
   const [expiryMinutes, setExpiryMinutes] = useState('')
   const [maxUses, setMaxUses] = useState('')
+  const [reusable, setReusable] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
+  const [scopes, setScopes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [createdKey, setCreatedKey] = useState<string | null>(null)
@@ -206,15 +366,28 @@ function GenerateKeyModal({
     try {
       const payload: any = {
         product_id: selectedProductId,
-        user_email: userEmail,
+        reusable: reusable,
+      }
+      
+      if (label) {
+        payload.label = label
       }
       
       if (expiryMinutes) {
         payload.expiry_minutes = parseInt(expiryMinutes)
       }
       
-      if (maxUses) {
+      if (reusable && maxUses) {
         payload.max_uses = parseInt(maxUses)
+      }
+      
+      // Advanced fields
+      if (userEmail) {
+        payload.user_email = userEmail
+      }
+      
+      if (scopes) {
+        payload.scopes = scopes
       }
 
       const response = await api.post('/access/keys', payload)
@@ -261,7 +434,7 @@ function GenerateKeyModal({
             {error}
           </div>
         )}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Product <span className="text-red-500">*</span>
@@ -291,53 +464,131 @@ function GenerateKeyModal({
               </p>
             )}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              User Email <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              required
-              value={userEmail}
-              onChange={(e) => setUserEmail(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
-              placeholder="user@example.com"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              The user must have an account with this email.
-            </p>
+
+          {/* Key Settings Section */}
+          <div className="border-t border-gray-200 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Key Settings</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Key Label
+                </label>
+                <input
+                  type="text"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                  placeholder="e.g., Marketing Campaign, Beta Access"
+                  maxLength={255}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Optional label for tagging and organizing keys.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Expiry (minutes)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={expiryMinutes}
+                  onChange={(e) => setExpiryMinutes(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                  placeholder="Leave empty for permanent key"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Optional. Leave empty to create a key that never expires.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Max Uses
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={maxUses}
+                  onChange={(e) => setMaxUses(e.target.value)}
+                  disabled={!reusable}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary disabled:bg-gray-50 disabled:text-gray-500"
+                  placeholder="Leave empty for unlimited"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Maximum number of uses. Only applies to reusable keys. Leave empty for unlimited.
+                </p>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="reusable"
+                  checked={reusable}
+                  onChange={(e) => {
+                    setReusable(e.target.checked)
+                    if (!e.target.checked) {
+                      setMaxUses('')
+                    }
+                  }}
+                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                />
+                <label htmlFor="reusable" className="ml-2 block text-sm text-gray-700">
+                  Reusable
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 -mt-2">
+                Allow this key to be used multiple times. If unchecked, key is single-use.
+              </p>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Custom Expiry (minutes)
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={expiryMinutes}
-              onChange={(e) => setExpiryMinutes(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
-              placeholder="Leave empty to use product default"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Override product's default duration. Leave empty to use product setting.
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Max Uses (for reusable keys)
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={maxUses}
-              onChange={(e) => setMaxUses(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
-              placeholder="Leave empty for unlimited"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Maximum number of times this key can be used. Only for reusable keys.
-            </p>
+
+          {/* Advanced Section */}
+          <div className="border-t border-gray-200 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center justify-between w-full text-sm font-semibold text-gray-900 mb-4"
+            >
+              <span>Advanced (optional)</span>
+              <span>{showAdvanced ? '−' : '+'}</span>
+            </button>
+            {showAdvanced && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    User Email
+                  </label>
+                  <input
+                    type="email"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                    placeholder="user@example.com"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Optional. If set, key will be assigned to this user on creation. Leave empty for unbound key.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Scopes
+                  </label>
+                  <input
+                    type="text"
+                    value={scopes}
+                    onChange={(e) => setScopes(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                    placeholder="e.g., read,write,admin"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Comma-separated list of scopes (e.g., read, write, admin).
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button
