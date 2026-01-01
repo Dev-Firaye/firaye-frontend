@@ -63,7 +63,7 @@ export default function ProductsPage() {
   }
 
   const handleOpenProduct = (key: AccessKey) => {
-    const redirectUrl = key.product?.redirect_url
+    const redirectUrl = key.product?.product_url || key.product?.redirect_url
     if (redirectUrl) {
       window.open(redirectUrl, '_blank')
     } else {

@@ -59,21 +59,29 @@ function ProductsPageContent() {
       const response = await api.get('/auth/products')
       const productsList = response.data.data?.products || []
       
-      // Load advanced fields from localStorage for each product
-      const productsWithAdvanced = productsList.map((product: Product) => {
-        const stored = localStorage.getItem(`product_${product.id}_advanced`)
-        if (stored) {
-          try {
-            const advanced = JSON.parse(stored)
-            return { ...product, ...advanced }
-          } catch (e) {
-            // Ignore parse errors
-          }
-        }
-        return product
-      })
-      
-      setProducts(productsWithAdvanced)
+      // Load key counts for each product
+      try {
+        const keysResponse = await api.get('/access/admin/keys')
+        const allKeys = keysResponse.data.data?.keys || []
+        
+        // Count keys per product
+        const keyCounts: Record<number, number> = {}
+        allKeys.forEach((key: any) => {
+          keyCounts[key.product_id] = (keyCounts[key.product_id] || 0) + 1
+        })
+        
+        // Add key counts to products
+        const productsWithCounts = productsList.map((product: Product) => ({
+          ...product,
+          key_count: keyCounts[product.id] || 0
+        }))
+        
+        setProducts(productsWithCounts)
+      } catch (keysError) {
+        // If key loading fails, just set products without counts
+        console.error('Failed to load key counts:', keysError)
+        setProducts(productsList)
+      }
     } catch (error) {
       console.error('Failed to load products:', error)
     } finally {
@@ -189,7 +197,7 @@ function ProductsPageContent() {
             <tbody className="bg-white divide-y divide-gray-200">
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
                     No products yet. Create your first product to get started.
                   </td>
                 </tr>
@@ -261,6 +269,11 @@ function ProductsPageContent() {
                       </span>
                     </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-900 font-medium">
+                        {product.key_count || 0}
+                      </span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <span
                         className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                           product.is_active
@@ -273,6 +286,13 @@ function ProductsPageContent() {
                     </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setShowGenerateKeyModal(product)}
+                          className="text-blue-600 hover:text-blue-900 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          title="Generate Key"
+                        >
+                          <SparklesIcon className="h-5 w-5" />
+                        </button>
                         <button
                           onClick={() => handleEdit(product)}
                           className="text-primary hover:text-primary-dark min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -378,13 +398,30 @@ function CreateProductModal({
         }
       }
 
-      // Prepare payload (only send fields that backend supports for now)
+      // Calculate access_duration_minutes from hours
+      const durationMinutes = durationHours * 60
+      
+      // Map access_type to access_expiry_type
+      let accessExpiryType = 'duration'
+      if (formData.access_type === 'fixed_expiry') {
+        accessExpiryType = 'one-time'
+      } else if (formData.max_activations && parseInt(formData.max_activations) > 1) {
+        accessExpiryType = 'reusable'
+      }
+      
+      // Prepare payload with new backend fields
       const payload: any = {
         name: formData.name,
         description: formData.description || null,
-        price: Math.round(parseFloat(formData.price) * 100), // Convert to cents
-        access_duration_hours: durationHours,
-        redirect_url: formData.redirect_url || null,
+        price: formData.price ? Math.round(parseFloat(formData.price) * 100) : 0, // Convert to cents
+        access_expiry_type: accessExpiryType,
+        access_duration_minutes: durationMinutes,
+        access_duration_hours: durationHours, // Keep for backward compatibility
+        product_url: formData.redirect_url || null,
+        redirect_url: formData.redirect_url || null, // Keep for backward compatibility
+        bundle_id: formData.bundled_products && formData.bundled_products.length > 0 
+          ? formData.bundled_products.join(',') 
+          : null,
         is_active: true, // Default to active
       }
 
@@ -614,14 +651,18 @@ function CreateProductModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Redirect URL (optional)
+              Product URL (optional)
             </label>
             <input
               type="url"
               value={formData.redirect_url}
               onChange={(e) => setFormData({ ...formData, redirect_url: e.target.value })}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              placeholder="https://example.com/product"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              URL to redirect users to after key validation
+            </p>
           </div>
 
           {/* Advanced Settings Collapsible */}
@@ -761,6 +802,157 @@ function CreateProductModal({
               className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50"
             >
               {loading ? (isEditing ? 'Saving...' : 'Creating...') : isEditing ? 'Save' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function GenerateKeyModal({
+  product,
+  onClose,
+  onSuccess,
+}: {
+  product: Product
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [userEmail, setUserEmail] = useState('')
+  const [expiryMinutes, setExpiryMinutes] = useState('')
+  const [maxUses, setMaxUses] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [createdKey, setCreatedKey] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      const payload: any = {
+        product_id: product.id,
+        user_email: userEmail,
+      }
+      
+      if (expiryMinutes) {
+        payload.expiry_minutes = parseInt(expiryMinutes)
+      }
+      
+      if (maxUses) {
+        payload.max_uses = parseInt(maxUses)
+      }
+
+      const response = await api.post('/access/keys', payload)
+      setCreatedKey(response.data.data.key)
+      setTimeout(() => {
+        onSuccess()
+      }, 2000)
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Failed to create key')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (createdKey) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Key Created Successfully</h2>
+          <div className="bg-gray-50 p-4 rounded mb-4">
+            <p className="text-sm text-gray-600 mb-2 font-medium">Access Key:</p>
+            <code className="text-sm font-mono break-all bg-white p-2 rounded block">{createdKey}</code>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Copy this key and share it with the user. This key will be shown only once.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Generate Access Key</h2>
+        <p className="text-sm text-gray-600 mb-4">Product: <strong>{product.name}</strong></p>
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              User Email <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              required
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              placeholder="user@example.com"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              The user must have an account with this email.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Custom Expiry (minutes)
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={expiryMinutes}
+              onChange={(e) => setExpiryMinutes(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              placeholder="Leave empty to use product default"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Override product's default duration. Leave empty to use product setting.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Max Uses (for reusable keys)
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={maxUses}
+              onChange={(e) => setMaxUses(e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              placeholder="Leave empty for unlimited"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Maximum number of times this key can be used. Only for reusable keys.
+            </p>
+          </div>
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50"
+            >
+              {loading ? 'Creating...' : 'Generate Key'}
             </button>
           </div>
         </form>

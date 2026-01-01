@@ -24,8 +24,13 @@ interface Product {
   description: string | null
   price: number
   access_duration_hours: number
-  redirect_url: string | null
+  access_duration_minutes?: number | null
+  access_expiry_type?: string
+  product_url?: string | null
+  redirect_url?: string | null
+  bundle_id?: string | null
   is_active: boolean
+  hasAccess?: boolean // Whether user already has access to this product
   merchant?: {
     id: number
     organization_name: string
@@ -92,9 +97,12 @@ export default function OffersPage() {
         })
       }
       
-      // Filter out products user already has access to
+      // Mark products user already has access to (but don't filter them out - show them with "Already Have Access" badge)
       const userProductIds = new Set(userKeys.map(k => k.product_id))
-      productsList = productsList.filter((p: Product) => !userProductIds.has(p.id))
+      productsList = productsList.map((p: Product) => ({
+        ...p,
+        hasAccess: userProductIds.has(p.id)
+      }))
       
       setProducts(productsList)
     } catch (err: any) {
