@@ -88,10 +88,13 @@ If unsure of what to do:
 **firaye-core**
 
 - Hosted on Render (free tier)
+- **Architecture**: Monolith deployment (all microservices mounted in single FastAPI app via `main.py`)
 - Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
 - Build command: `poetry install && alembic upgrade head` (includes database migrations)
-- Subdomain: will be `api.firaye.com`
+- Subdomain: `api.firaye.com`
 - **CRITICAL**: Must set `DATABASE_URL` environment variable in Render to your Render PostgreSQL connection string (NOT localhost!)
+- **Monolith Structure**: `main.py` mounts auth, access, and notification services at `/auth`, `/access`, `/notification`
+- **Package Mode**: `package-mode = false` in `pyproject.toml` (prevents Poetry build errors on Render)
 
 ---
 
@@ -193,17 +196,21 @@ npm start
 
 ### Merchant Dashboard
 
-- **Authentication**: JWT-based login with secure cookie storage
+- **Authentication**: JWT-based login with secure cookie storage, merchant signup
 - **Dashboard**: Overview with key metrics and recent activity
-- **Product Management**: Full CRUD operations for products
-- **Access Key Management**: Generate and revoke keys for products
+- **Product Management**: Full CRUD operations for products (with product_url, access_expiry_type, access_duration_minutes, bundle_id)
+- **Access Key Management**: 
+  - Generate keys with advanced options (label, scopes, reusable, max_uses, optional user assignment)
+  - Searchable and filterable key list (by status, type, bound/unbound)
+  - Keys can be single-use or reusable, expiring or permanent, bound or unbound
 - **Activity Logs**: View key events (placeholder for /access/logs endpoint)
 - **Settings**: Configure webhooks and notifications (placeholder)
 
 ### User App
 
-- **Authentication**: User login to access their keys
-- **Key Management**: View all active access keys
+- **Authentication**: User login and signup
+- **Offers Page**: Browse public products, see if user already has access
+- **Key Management**: View all active access keys with product details
 - **Product Access**: Redirect to merchant URLs when keys are valid
 - **Profile**: View user information and account status
 
@@ -227,17 +234,26 @@ Both apps use JWT authentication:
 
 ### Implemented Endpoints
 
+**Authentication:**
 - `POST /auth/login` - User authentication
+- `POST /auth/signup/user` - User registration
+- `POST /auth/signup/merchant` - Merchant registration
 - `GET /auth/me` - Get current user
+
+**Products:**
 - `GET /auth/products` - List merchant products
-- `POST /auth/products` - Create product
+- `GET /auth/products/public` - List all public products (for user app)
+- `POST /auth/products` - Create product (with fields: name, description, price, product_url, access_expiry_type, access_duration_minutes, bundle_id)
 - `GET /auth/products/{id}` - Get product details
 - `PUT /auth/products/{id}` - Update product
 - `DELETE /auth/products/{id}` - Delete product
-- `POST /access/keys` - Create access key
-- `GET /access/admin/keys` - List all keys
+
+**Access Keys:**
+- `POST /access/keys` - Create access key (supports optional user_email, label, scopes, reusable, max_uses, expiry_minutes)
+- `GET /access/keys` - List user's access keys (for user app)
+- `GET /access/admin/keys` - List all merchant keys (with filters: user_id, status, reusable, bound/unbound)
 - `DELETE /access/keys/{key}` - Revoke key
-- `POST /access/validate` - Validate key (used by external apps)
+- `POST /access/validate` - Validate key (used by external apps, handles reusable keys and max_uses)
 
 ### Placeholder Endpoints
 
@@ -298,14 +314,37 @@ Both apps use a shared API client pattern (`lib/api.ts`) that:
 - **Sidebar** (Merchant): Navigation sidebar for dashboard
 - **Navbar** (User): Top navigation bar for user app
 
+## 📝 Recent Implementations (2024-2025)
+
+### Access Key System Redesign
+- **Optional User Assignment**: Keys can be unbound (not assigned to a user) or bound to a specific user
+- **Key Labeling**: Optional label field for tagging keys (e.g., "Marketing Campaign", "Beta Access")
+- **Scopes**: Comma-separated scopes (e.g., "read,write,admin")
+- **Reusable Keys**: Keys can be single-use or reusable with optional max_uses limit
+- **Permanent Keys**: Keys can have no expiry (expires_at = null)
+- **Search & Filters**: Access Keys page has search and filters for status, type, and user binding
+
+### Product Enhancements
+- **Product URL**: New `product_url` field (preferred over legacy `redirect_url`)
+- **Access Expiry Types**: Support for one-time, duration, and reusable access
+- **Bundle Support**: Optional `bundle_id` for grouped products
+- **Duration in Minutes**: New `access_duration_minutes` field (preferred over hours)
+
+### Database Migrations
+- `add_product_enhancements.py` - Added product_url, access_expiry_type, bundle_id, access_duration_minutes, max_uses
+- `add_accesskey_enhancements.py` - Made user_id and expires_at optional, added label, scopes, reusable, max_uses, uses_count
+
+### Signup Endpoints
+- `POST /auth/signup/user` - Regular user registration
+- `POST /auth/signup/merchant` - Merchant registration (creates both user and merchant records)
+
 ## 📝 Next Steps
 
 1. **Backend Endpoints**: Implement `/access/summary`, `/access/logs`, and `/webhook`
-2. **User Key Filtering**: Update `/access/admin/keys` to filter by current user for user app
-3. **Product Detail Page**: Add edit functionality for products
-4. **Error Handling**: Enhance error messages and retry logic
-5. **Loading States**: Add skeleton loaders for better UX
-6. **Responsive Design**: Ensure mobile-friendly layouts
+2. **Product Detail Page**: Edit functionality already implemented
+3. **Error Handling**: Enhanced error messages implemented
+4. **Loading States**: Skeleton loaders implemented
+5. **Responsive Design**: Mobile-friendly layouts implemented
 
 ## 🐛 Troubleshooting
 
