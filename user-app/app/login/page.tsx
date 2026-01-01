@@ -59,7 +59,24 @@ function LoginForm() {
         setError('Invalid credentials')
       }
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'Login failed. Please try again.')
+      // Extract error message with more detail
+      const errorData = err.response?.data?.error
+      let errorMessage = errorData?.message || 'Login failed. Please try again.'
+      
+      // Add helpful hints for common errors
+      if (errorData?.details?.hint) {
+        errorMessage += ` (${errorData.details.hint})`
+      }
+      
+      // Log full error for debugging
+      console.error('Login error:', {
+        status: err.response?.status,
+        message: errorMessage,
+        details: errorData?.details,
+        fullError: err.response?.data
+      })
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
