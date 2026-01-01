@@ -410,7 +410,12 @@ export default function OffersPage() {
 
                     {/* CTA Buttons */}
                     <div className="space-y-2 pt-4 border-t border-gray-100">
-                      {available && product.auto_grant_on_login && (
+                      {product.hasAccess ? (
+                        <div className="w-full flex items-center justify-center px-4 py-3 bg-green-50 border-2 border-green-200 text-green-800 rounded-lg font-semibold text-sm min-h-[44px]">
+                          <CheckCircleIcon className="h-5 w-5 mr-2" />
+                          You Have Access
+                        </div>
+                      ) : available && product.auto_grant_on_login ? (
                         <button
                           onClick={() => handleClaim(product)}
                           className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-primary to-primary-dark text-white rounded-lg hover:from-primary-dark hover:to-primary transition-all font-semibold text-sm shadow-md hover:shadow-lg min-h-[44px]"
@@ -418,8 +423,7 @@ export default function OffersPage() {
                           <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
                           Claim Trial
                         </button>
-                      )}
-                      {available && !product.auto_grant_on_login && (
+                      ) : available && !product.auto_grant_on_login ? (
                         <button
                           onClick={() => handleRequestAccess(product)}
                           className="w-full flex items-center justify-center px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-semibold text-sm shadow-md hover:shadow-lg min-h-[44px]"
@@ -427,7 +431,7 @@ export default function OffersPage() {
                           <EnvelopeIcon className="h-5 w-5 mr-2" />
                           Request Access
                         </button>
-                      )}
+                      ) : null}
                       {product.merchant?.website && (
                         <button
                           onClick={() => window.open(product.merchant!.website!, '_blank')}
@@ -437,7 +441,7 @@ export default function OffersPage() {
                           Learn More
                         </button>
                       )}
-                      {!available && (
+                      {!available && !product.hasAccess && (
                         <div className="text-sm text-gray-500 text-center py-2 bg-gray-50 rounded-lg">
                           {product.available_from && new Date(product.available_from) > new Date() && (
                             <span>Available from {formatExpiry(product.available_from)}</span>
