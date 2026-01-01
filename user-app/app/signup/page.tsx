@@ -1,26 +1,28 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import axios from 'axios'
 import Cookies from 'js-cookie'
 
-function LoginForm() {
+export default function SignupPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+  })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    // Check for error query parameter
-    const errorParam = searchParams.get('error')
-    if (errorParam === 'unauthorized') {
-      setError('Access denied. This app is for regular users only. Please use the merchant dashboard if you are a merchant.')
-    }
-  }, [searchParams])
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    })
+    setError('')
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,48 +31,42 @@ function LoginForm() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
-      const response = await axios.post(`${apiUrl}/auth/login`, {
-        email,
-        password,
+      const response = await axios.post(`${apiUrl}/auth/signup/user`, {
+        email: formData.email,
+        password: formData.password,
+        full_name: formData.fullName || undefined,
       })
 
       if (response.data.success && response.data.data.tokens) {
         const token = response.data.data.tokens.access_token
         
-        // Check user role before storing token
-        const tokenParts = token.split('.')
-        if (tokenParts.length === 3) {
-          const payload = JSON.parse(atob(tokenParts[1].replace(/-/g, '+').replace(/_/g, '/')))
-          const userRole = payload.role
-
-          if (userRole !== 'user') {
-            setError('Access denied. This app is for regular users only. Please use the merchant dashboard if you are a merchant.')
-            setLoading(false)
-            return
-          }
-        }
-
+        // Store token
         Cookies.set('firaye_token', token, {
-          expires: 7,
+          expires: 7, // 7 days
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'strict',
         })
+
+        // Store refresh token
+        Cookies.set('firaye_refresh_token', response.data.data.tokens.refresh_token, {
+          expires: 30, // 30 days
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+        })
+
         router.push('/keys')
       } else {
-        setError('Invalid credentials')
+        setError('Signup failed. Please try again.')
       }
     } catch (err: any) {
-      // Extract error message with more detail
       const errorData = err.response?.data?.error
-      let errorMessage = errorData?.message || 'Login failed. Please try again.'
+      let errorMessage = errorData?.message || 'Signup failed. Please try again.'
       
-      // Add helpful hints for common errors
       if (errorData?.details?.hint) {
         errorMessage += ` (${errorData.details.hint})`
       }
       
-      // Log full error for debugging
-      console.error('Login error:', {
+      console.error('Signup error:', {
         status: err.response?.status,
         message: errorMessage,
         details: errorData?.details,
@@ -88,7 +84,7 @@ function LoginForm() {
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-primary mb-2">firaye</h1>
-          <p className="text-gray-600">Sign in to view your access keys</p>
+          <p className="text-gray-600">Create your account</p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
@@ -99,7 +95,7 @@ function LoginForm() {
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
+                Email address *
               </label>
               <input
                 id="email"
@@ -107,23 +103,39 @@ function LoginForm() {
                 type="email"
                 autoComplete="email"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={handleChange}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
               />
             </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
+                Password *
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                value={formData.password}
+                onChange={handleChange}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+              />
+              <p className="mt-1 text-xs text-gray-500">Must be at least 8 characters</p>
+            </div>
+            <div>
+              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                Full Name
+              </label>
+              <input
+                id="fullName"
+                name="fullName"
+                type="text"
+                autoComplete="name"
+                value={formData.fullName}
+                onChange={handleChange}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
               />
             </div>
@@ -134,32 +146,20 @@ function LoginForm() {
               disabled={loading}
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? 'Creating account...' : 'Create Account'}
             </button>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link href="/signup" className="font-medium text-primary hover:text-primary-dark">
-                Sign up
+              Already have an account?{' '}
+              <Link href="/login" className="font-medium text-primary hover:text-primary-dark">
+                Sign in
               </Link>
             </p>
           </div>
         </form>
       </div>
     </div>
-  )
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    }>
-      <LoginForm />
-    </Suspense>
   )
 }
 

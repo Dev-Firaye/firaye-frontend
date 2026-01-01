@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import axios from 'axios'
 import Cookies from 'js-cookie'
 
@@ -146,6 +147,14 @@ function LoginForm() {
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <Link href="/signup" className="font-medium text-primary hover:text-primary-dark">
+                Sign up
+              </Link>
+            </p>
           </div>
         </form>
       </div>
